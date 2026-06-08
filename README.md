@@ -12,6 +12,33 @@ dotnet run --project src/PumpTelemetry.Monitor
 
 Press `Ctrl+C` to stop the monitor gracefully.
 
+## Alert history dashboard
+
+The monitor now persists generated alerts to a local JSON file named `alert-history.json`
+by default. When the monitor starts, it loads saved alerts and prints a recent alert
+history before live telemetry begins.
+
+Examples:
+
+```powershell
+dotnet run --project src/PumpTelemetry.Monitor
+dotnet run --project src/PumpTelemetry.Monitor -- --history-only --last=5
+dotnet run --project src/PumpTelemetry.Monitor -- --history-only --type=HighPressure
+dotnet run --project src/PumpTelemetry.Monitor -- --history-only --type=HighPressure --last=5
+dotnet run --project src/PumpTelemetry.Monitor -- --history-file=./data/alerts.json
+```
+
+Supported options:
+
+- `--last=N`: show the most recent `N` saved alerts.
+- `--type=AlertType`: filter history by alert type, such as `HighPressure`,
+  `OutOfOrderSequence`, or `DeviceSilent`.
+- `--history-only`: display saved history and exit without starting live monitoring.
+- `--history-file=PATH`: read and write alert history from a custom JSON file path.
+
+Persisted alert records include timestamp, alert type, device id, message, and the
+available sensor value or pressure threshold when applicable.
+
 ## How to test
 
 ```powershell

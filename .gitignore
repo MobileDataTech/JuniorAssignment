@@ -56,6 +56,7 @@ StyleCopReport.xml
 # DotNet CLI
 project.assets.json
 *.dotnet.*
+alert-history*.json
 
 # Rider, VS Code, Visual Studio Code
 .idea/
