@@ -12,11 +12,65 @@ dotnet run --project src/PumpTelemetry.Monitor
 
 Press `Ctrl+C` to stop the monitor gracefully.
 
+## Alert History Dashboard
+
+The monitor persists generated alerts to a local JSON file named `alert-history.json`.
+
+When the monitor starts, it loads saved alert history from this file and displays matching history records in the console before live monitoring begins. New alerts generated during the current run are also appended to the same history file.
+
+Each saved alert record includes:
+
+- timestamp
+- device or pump ID
+- alert type
+- severity
+- message
+- sensor value when available
+
+Severity is assigned from the alert type:
+
+- `HighPressure` -> `High`
+- `DeviceSilent` -> `High`
+- `OutOfOrderSequence` -> `Medium`
+
+`DeviceSilent` alerts do not include a sensor value because there is no current telemetry reading when the device 
+is silent.
+
 ## How to test
 
 ```powershell
 dotnet test
 ```
+
+## Alert History Filters
+
+The monitor supports simple command-line filters for the startup history display.
+
+Show only the last 5 saved alerts:
+
+```powershell
+dotnet run --project src/PumpTelemetry.Monitor -- --last=5
+```
+
+Show only high severity alerts:
+
+```powershell
+dotnet run --project src/PumpTelemetry.Monitor -- --severity=High
+```
+
+Show alerts from the last 24 hours:
+
+```powershell
+dotnet run --project src/PumpTelemetry.Monitor -- --since-hours=24
+```
+
+Filters can also be combined:
+
+```powershell
+dotnet run --project src/PumpTelemetry.Monitor -- --severity=High --last=10
+```
+
+The filters only affect what is displayed in the console at startup. They do not delete older alerts from `alert-history.json`.
 
 ## Architecture choices
 
