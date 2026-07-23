@@ -36,6 +36,16 @@ The contract is storage-independent so the monitor can use JSON persistence with
 alert generation to a file format. It also allows tests to substitute an in-memory store while
 the production application uses a file-backed implementation.
 
+`JsonAlertHistoryStore` is the local file implementation. It receives its history file path
+through the constructor, stores alerts in a JSON array, and writes alert types as readable enum
+names. Saving an alert retains the existing entries before adding the new one. File operations
+are asynchronous, and access through one store instance is serialized so simultaneous alert
+writes do not corrupt history.
+
+Loading a path that does not exist returns an empty history. Invalid JSON instead produces an
+`InvalidDataException` that identifies the affected file, leaving the existing content untouched
+for diagnosis.
+
 The console app starts five simulated devices. Each device emits a `TelemetryReading` every 100-500ms with a device id, timestamp, pressure, temperature, and sequence number. The simulator occasionally produces a pressure spike and an out-of-order sequence so the alert paths can be seen during a short run.
 
 ## Concurrency approach
