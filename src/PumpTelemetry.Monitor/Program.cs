@@ -7,7 +7,7 @@ using System.Threading.Channels;
 const int defaultHistoryCount = 10;
 
 // Validate command-line input before opening history or starting background work.
-if (!TryParseHistorySelection(args, defaultHistoryCount, out var historySelection))
+if (!HistoryOptionsParser.TryParse(args, defaultHistoryCount, out var historySelection))
 {
     Console.Error.WriteLine(
         "Invalid arguments. Usage: PumpTelemetry.Monitor [--last=N | --all], where N is zero or greater.");
@@ -114,41 +114,4 @@ catch (ChannelClosedException)
 finally
 {
     await pipeline.StopAsync().ConfigureAwait(false);
-}
-
-// Accept no arguments for the default, --last=N for a limit, or --all for complete history.
-static bool TryParseHistorySelection(
-    string[] arguments,
-    int defaultCount,
-    out HistorySelection selection)
-{
-    selection = new HistorySelection(ShowAll: false, Count: defaultCount);
-
-    if (arguments.Length == 0)
-    {
-        return true;
-    }
-
-    if (arguments.Length != 1)
-    {
-        return false;
-    }
-
-    if (string.Equals(arguments[0], "--all", StringComparison.Ordinal))
-    {
-        selection = new HistorySelection(ShowAll: true, Count: 0);
-        return true;
-    }
-
-    const string optionPrefix = "--last=";
-
-    if (!arguments[0].StartsWith(optionPrefix, StringComparison.Ordinal)
-        || !int.TryParse(arguments[0][optionPrefix.Length..], out var count)
-        || count < 0)
-    {
-        return false;
-    }
-
-    selection = new HistorySelection(ShowAll: false, Count: count);
-    return true;
 }
