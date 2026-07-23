@@ -1,4 +1,5 @@
 using PumpTelemetry.Core;
+using PumpTelemetry.Monitor;
 using System.Threading.Channels;
 
 // The monitor is the composition root: it loads saved history, configures the telemetry
@@ -6,9 +7,10 @@ using System.Threading.Channels;
 const int defaultHistoryCount = 10;
 
 // Validate command-line input before opening history or starting background work.
-if (!TryParseHistoryCount(args, defaultHistoryCount, out var historyCount))
+if (!TryParseHistorySelection(args, defaultHistoryCount, out var historySelection))
 {
-    Console.Error.WriteLine("Invalid arguments. Usage: PumpTelemetry.Monitor [--last=N], where N is zero or greater.");
+    Console.Error.WriteLine(
+        "Invalid arguments. Usage: PumpTelemetry.Monitor [--last=N | --all], where N is zero or greater.");
     return;
 }
 
@@ -16,22 +18,27 @@ if (!TryParseHistoryCount(args, defaultHistoryCount, out var historyCount))
 var historyFilePath = Path.Combine(Environment.CurrentDirectory, "alerts.json");
 IAlertHistoryStore historyStore = new JsonAlertHistoryStore(historyFilePath);
 var savedAlerts = await historyStore.LoadAsync().ConfigureAwait(false);
-var recentAlerts = AlertHistoryFilter.GetRecent(savedAlerts, historyCount);
+var displayedAlerts = AlertHistoryFilter.GetRecent(
+    savedAlerts,
+    historySelection.ShowAll ? savedAlerts.Count : historySelection.Count);
 
 // Display saved alerts before live telemetry output begins.
-Console.WriteLine($"Recent alert history (up to {historyCount}):");
+Console.WriteLine(
+    historySelection.ShowAll
+        ? "Saved alert history:"
+        : $"Recent alert history (up to {historySelection.Count}):");
 
 if (savedAlerts.Count == 0)
 {
     Console.WriteLine("No saved alert history found.");
 }
-else if (recentAlerts.Count == 0)
+else if (displayedAlerts.Count == 0)
 {
     Console.WriteLine("No alerts selected.");
 }
 else
 {
-    foreach (var alert in recentAlerts)
+    foreach (var alert in displayedAlerts)
     {
         Console.WriteLine(AlertHistoryFormatter.Format(alert));
     }
@@ -109,20 +116,39 @@ finally
     await pipeline.StopAsync().ConfigureAwait(false);
 }
 
-// Accept either no arguments, which uses the default, or one non-negative --last=N option.
-static bool TryParseHistoryCount(string[] arguments, int defaultCount, out int count)
+// Accept no arguments for the default, --last=N for a limit, or --all for complete history.
+static bool TryParseHistorySelection(
+    string[] arguments,
+    int defaultCount,
+    out HistorySelection selection)
 {
-    count = defaultCount;
+    selection = new HistorySelection(ShowAll: false, Count: defaultCount);
 
     if (arguments.Length == 0)
     {
         return true;
     }
 
+    if (arguments.Length != 1)
+    {
+        return false;
+    }
+
+    if (string.Equals(arguments[0], "--all", StringComparison.Ordinal))
+    {
+        selection = new HistorySelection(ShowAll: true, Count: 0);
+        return true;
+    }
+
     const string optionPrefix = "--last=";
 
-    return arguments.Length == 1
-        && arguments[0].StartsWith(optionPrefix, StringComparison.Ordinal)
-        && int.TryParse(arguments[0][optionPrefix.Length..], out count)
-        && count >= 0;
+    if (!arguments[0].StartsWith(optionPrefix, StringComparison.Ordinal)
+        || !int.TryParse(arguments[0][optionPrefix.Length..], out var count)
+        || count < 0)
+    {
+        return false;
+    }
+
+    selection = new HistorySelection(ShowAll: false, Count: count);
+    return true;
 }

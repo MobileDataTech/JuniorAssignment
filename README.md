@@ -22,6 +22,15 @@ dotnet run --project src/PumpTelemetry.Monitor -- --last=20
 and exit without starting the monitor. If `alerts.json` does not exist, the monitor reports that
 no saved history was found and continues normally.
 
+To display every saved alert, ordered from newest to oldest, use:
+
+```powershell
+dotnet run --project src/PumpTelemetry.Monitor -- --all
+```
+
+`--all` and `--last=N` are alternative startup display modes and cannot be used together.
+The all-history option can produce substantial console output when the history file is large.
+
 Press `Ctrl+C` to stop the monitor gracefully.
 
 ## How to test
