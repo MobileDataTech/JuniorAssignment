@@ -9,6 +9,61 @@ public sealed class AlertHistoryFilterTests
         new(2026, 7, 23, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public void GetByTimeRange_ReturnsAlertsWithinInclusiveBounds()
+    {
+        var before = Alert("pump-01", BaseTimestamp.AddMinutes(-1));
+        var atStart = Alert("pump-02", BaseTimestamp);
+        var inside = Alert("pump-03", BaseTimestamp.AddMinutes(1));
+        var atEnd = Alert("pump-04", BaseTimestamp.AddMinutes(2));
+        var after = Alert("pump-05", BaseTimestamp.AddMinutes(3));
+
+        var result = AlertHistoryFilter.GetByTimeRange(
+            new[] { before, atStart, inside, atEnd, after },
+            BaseTimestamp,
+            BaseTimestamp.AddMinutes(2));
+
+        Assert.Equal(new[] { atStart, inside, atEnd }, result);
+    }
+
+    [Fact]
+    public void GetByTimeRange_WhenStartIsMissing_AppliesOnlyEndBound()
+    {
+        var beforeEnd = Alert("pump-01", BaseTimestamp);
+        var afterEnd = Alert("pump-02", BaseTimestamp.AddMinutes(2));
+
+        var result = AlertHistoryFilter.GetByTimeRange(
+            new[] { beforeEnd, afterEnd },
+            from: null,
+            to: BaseTimestamp.AddMinutes(1));
+
+        Assert.Equal(new[] { beforeEnd }, result);
+    }
+
+    [Fact]
+    public void GetByTimeRange_WhenEndIsMissing_AppliesOnlyStartBound()
+    {
+        var beforeStart = Alert("pump-01", BaseTimestamp);
+        var afterStart = Alert("pump-02", BaseTimestamp.AddMinutes(2));
+
+        var result = AlertHistoryFilter.GetByTimeRange(
+            new[] { beforeStart, afterStart },
+            from: BaseTimestamp.AddMinutes(1),
+            to: null);
+
+        Assert.Equal(new[] { afterStart }, result);
+    }
+
+    [Fact]
+    public void GetByTimeRange_WhenStartIsAfterEnd_ThrowsArgumentException()
+    {
+        Assert.Throws<ArgumentException>(
+            () => AlertHistoryFilter.GetByTimeRange(
+                Array.Empty<TelemetryAlert>(),
+                BaseTimestamp.AddMinutes(1),
+                BaseTimestamp));
+    }
+
+    [Fact]
     public void GetBySeverity_ReturnsOnlyAlertsWithRequestedSeverity()
     {
         var criticalPressure = Alert(

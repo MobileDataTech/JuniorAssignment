@@ -46,6 +46,17 @@ High-pressure and silent-device alerts are classified as `Critical`. Out-of-orde
 alerts are classified as `Warning`. Severity filtering is an alternative to `--last=N` and
 `--all`; only one startup display option can be supplied.
 
+To display alerts within an inclusive time range, use ISO-8601 timestamps:
+
+```powershell
+dotnet run --project src/PumpTelemetry.Monitor -- --from=2026-07-23T08:00:00Z --to=2026-07-23T17:00:00Z
+```
+
+Either bound can be used by itself. `--from=TIMESTAMP` displays alerts at or after the start,
+while `--to=TIMESTAMP` displays alerts at or before the end. Results are ordered newest-first.
+The start must not be later than the end, and time-range options cannot be combined with
+`--last=N`, `--all`, or `--severity`.
+
 If `alerts.json` does not exist, the monitor treats the history as empty, reports that no saved
 alerts were found, and continues normally. If an alert cannot be persisted, the monitor reports
 the failure to standard error and continues processing and displaying live telemetry alerts.

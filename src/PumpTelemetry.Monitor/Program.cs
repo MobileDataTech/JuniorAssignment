@@ -10,7 +10,7 @@ const int defaultHistoryCount = 10;
 if (!HistoryOptionsParser.TryParse(args, defaultHistoryCount, out var historySelection))
 {
     Console.Error.WriteLine(
-        "Invalid arguments. Usage: PumpTelemetry.Monitor [--last=N | --all | --severity=Warning|Critical], where N is zero or greater.");
+        "Invalid arguments. Usage: PumpTelemetry.Monitor [--last=N | --all | --severity=Warning|Critical | --from=TIMESTAMP [--to=TIMESTAMP] | --to=TIMESTAMP], where N is zero or greater and timestamps use ISO 8601.");
     return;
 }
 
@@ -21,19 +21,24 @@ var savedAlerts = await historyStore.LoadAsync().ConfigureAwait(false);
 var severityAlerts = historySelection.Severity.HasValue
     ? AlertHistoryFilter.GetBySeverity(savedAlerts, historySelection.Severity.Value)
     : savedAlerts;
+var rangeAlerts = historySelection.From.HasValue || historySelection.To.HasValue
+    ? AlertHistoryFilter.GetByTimeRange(
+        severityAlerts,
+        historySelection.From,
+        historySelection.To)
+    : severityAlerts;
 var displayedAlerts = AlertHistoryFilter.GetRecent(
-    severityAlerts,
-    historySelection.ShowAll || historySelection.Severity.HasValue
-        ? severityAlerts.Count
+    rangeAlerts,
+    historySelection.ShowAll
+        || historySelection.Severity.HasValue
+        || historySelection.From.HasValue
+        || historySelection.To.HasValue
+        ? rangeAlerts.Count
         : historySelection.Count);
 
 // Display saved alerts before live telemetry output begins.
 Console.WriteLine(
-    historySelection.Severity.HasValue
-        ? $"Alert history with severity {historySelection.Severity}:"
-        : historySelection.ShowAll
-            ? "Saved alert history:"
-            : $"Recent alert history (up to {historySelection.Count}):");
+    GetHistoryHeading(historySelection));
 
 if (savedAlerts.Count == 0)
 {
@@ -121,4 +126,24 @@ catch (ChannelClosedException)
 finally
 {
     await pipeline.StopAsync().ConfigureAwait(false);
+}
+
+// Describe the selected startup history view without duplicating filtering behavior.
+static string GetHistoryHeading(HistorySelection selection)
+{
+    if (selection.Severity.HasValue)
+    {
+        return $"Alert history with severity {selection.Severity}:";
+    }
+
+    if (selection.From.HasValue || selection.To.HasValue)
+    {
+        var from = selection.From?.ToString("O") ?? "the beginning";
+        var to = selection.To?.ToString("O") ?? "now";
+        return $"Alert history from {from} to {to}:";
+    }
+
+    return selection.ShowAll
+        ? "Saved alert history:"
+        : $"Recent alert history (up to {selection.Count}):";
 }

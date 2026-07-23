@@ -51,6 +51,44 @@ public sealed class HistoryOptionsParserTests
         Assert.Null(selection.Severity);
     }
 
+    [Fact]
+    public void TryParse_WhenClosedTimeRangeIsValid_SelectsBothBounds()
+    {
+        var success = HistoryOptionsParser.TryParse(
+            new[]
+            {
+                "--from=2026-07-23T08:00:00Z",
+                "--to=2026-07-23T17:00:00Z"
+            },
+            DefaultCount,
+            out var selection);
+
+        Assert.True(success);
+        Assert.Equal(
+            new DateTimeOffset(2026, 7, 23, 8, 0, 0, TimeSpan.Zero),
+            selection.From);
+        Assert.Equal(
+            new DateTimeOffset(2026, 7, 23, 17, 0, 0, TimeSpan.Zero),
+            selection.To);
+    }
+
+    [Theory]
+    [InlineData("--from=2026-07-23T08:00:00Z", true)]
+    [InlineData("--to=2026-07-23T17:00:00Z", false)]
+    public void TryParse_WhenTimeRangeIsOpenEnded_SelectsSuppliedBound(
+        string argument,
+        bool hasStart)
+    {
+        var success = HistoryOptionsParser.TryParse(
+            new[] { argument },
+            DefaultCount,
+            out var selection);
+
+        Assert.True(success);
+        Assert.Equal(hasStart, selection.From.HasValue);
+        Assert.Equal(!hasStart, selection.To.HasValue);
+    }
+
     [Theory]
     [InlineData("--severity=Warning", TelemetryAlertSeverity.Warning)]
     [InlineData("--severity=critical", TelemetryAlertSeverity.Critical)]
@@ -74,6 +112,8 @@ public sealed class HistoryOptionsParserTests
     [InlineData("--severity=")]
     [InlineData("--severity=Unknown")]
     [InlineData("--severity=1")]
+    [InlineData("--from=not-a-date")]
+    [InlineData("--to=not-a-date")]
     public void TryParse_WhenOptionIsInvalid_ReturnsFalse(string argument)
     {
         var success = HistoryOptionsParser.TryParse(
@@ -100,6 +140,24 @@ public sealed class HistoryOptionsParserTests
     {
         var success = HistoryOptionsParser.TryParse(
             new[] { "--all", "--last=20" },
+            DefaultCount,
+            out _);
+
+        Assert.False(success);
+    }
+
+    [Theory]
+    [InlineData("--from=2026-07-23T17:00:00Z", "--to=2026-07-23T08:00:00Z")]
+    [InlineData("--from=2026-07-23T08:00:00Z", "--from=2026-07-23T09:00:00Z")]
+    [InlineData("--to=2026-07-23T17:00:00Z", "--to=2026-07-23T18:00:00Z")]
+    [InlineData("--from=2026-07-23T08:00:00Z", "--all")]
+    [InlineData("--to=2026-07-23T17:00:00Z", "--severity=Critical")]
+    public void TryParse_WhenTimeRangeArgumentsConflict_ReturnsFalse(
+        string first,
+        string second)
+    {
+        var success = HistoryOptionsParser.TryParse(
+            new[] { first, second },
             DefaultCount,
             out _);
 
@@ -142,6 +200,34 @@ public sealed class HistoryOptionsParserTests
         var result = AlertHistoryFilter.GetRecent(matchingAlerts, matchingAlerts.Count);
 
         Assert.Equal(new[] { alerts[2], alerts[0] }, result);
+    }
+
+    [Fact]
+    public void TimeRangeSelection_ReturnsMatchingSavedAlertsNewestFirst()
+    {
+        var alerts = new[]
+        {
+            Alert("pump-01", BaseTimestamp),
+            Alert("pump-02", BaseTimestamp.AddMinutes(1)),
+            Alert("pump-03", BaseTimestamp.AddMinutes(2)),
+            Alert("pump-04", BaseTimestamp.AddMinutes(3))
+        };
+        HistoryOptionsParser.TryParse(
+            new[]
+            {
+                $"--from={BaseTimestamp.AddMinutes(1):O}",
+                $"--to={BaseTimestamp.AddMinutes(2):O}"
+            },
+            DefaultCount,
+            out var selection);
+
+        var matchingAlerts = AlertHistoryFilter.GetByTimeRange(
+            alerts,
+            selection.From,
+            selection.To);
+        var result = AlertHistoryFilter.GetRecent(matchingAlerts, matchingAlerts.Count);
+
+        Assert.Equal(new[] { alerts[2], alerts[1] }, result);
     }
 
     private static TelemetryAlert Alert(

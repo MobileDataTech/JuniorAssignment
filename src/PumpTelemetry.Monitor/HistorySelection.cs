@@ -16,7 +16,15 @@ using PumpTelemetry.Core;
 /// <param name="Severity">
 /// The severity to display, or <see langword="null"/> when history is not filtered by severity.
 /// </param>
+/// <param name="From">
+/// The optional inclusive start of the history time range.
+/// </param>
+/// <param name="To">
+/// The optional inclusive end of the history time range.
+/// </param>
 internal sealed record HistorySelection(
     bool ShowAll,
     int Count,
-    TelemetryAlertSeverity? Severity);
+    TelemetryAlertSeverity? Severity,
+    DateTimeOffset? From,
+    DateTimeOffset? To);

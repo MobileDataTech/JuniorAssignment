@@ -6,6 +6,41 @@ namespace PumpTelemetry.Core;
 public static class AlertHistoryFilter
 {
     /// <summary>
+    /// Selects alerts whose timestamps fall within an inclusive time range.
+    /// </summary>
+    /// <param name="alerts">The alerts to filter.</param>
+    /// <param name="from">
+    /// The optional earliest timestamp to include, or <see langword="null"/> for no lower bound.
+    /// </param>
+    /// <param name="to">
+    /// The optional latest timestamp to include, or <see langword="null"/> for no upper bound.
+    /// </param>
+    /// <returns>A read-only list containing alerts within the requested time range.</returns>
+    /// <exception cref="ArgumentNullException">
+    /// Thrown when <paramref name="alerts"/> is <see langword="null"/>.
+    /// </exception>
+    /// <exception cref="ArgumentException">
+    /// Thrown when <paramref name="from"/> is later than <paramref name="to"/>.
+    /// </exception>
+    public static IReadOnlyList<TelemetryAlert> GetByTimeRange(
+        IEnumerable<TelemetryAlert> alerts,
+        DateTimeOffset? from,
+        DateTimeOffset? to)
+    {
+        ArgumentNullException.ThrowIfNull(alerts);
+
+        if (from > to)
+        {
+            throw new ArgumentException("The start of the time range cannot be later than the end.");
+        }
+
+        return alerts
+            .Where(alert => !from.HasValue || alert.Timestamp >= from.Value)
+            .Where(alert => !to.HasValue || alert.Timestamp <= to.Value)
+            .ToArray();
+    }
+
+    /// <summary>
     /// Selects alerts that have the requested severity.
     /// </summary>
     /// <param name="alerts">The alerts to filter.</param>

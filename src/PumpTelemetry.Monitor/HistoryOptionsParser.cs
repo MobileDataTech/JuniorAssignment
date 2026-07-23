@@ -1,6 +1,7 @@
 namespace PumpTelemetry.Monitor;
 
 using PumpTelemetry.Core;
+using System.Globalization;
 
 /// <summary>
 /// Parses the command-line option that controls startup alert history output.
@@ -9,7 +10,8 @@ internal static class HistoryOptionsParser
 {
     /// <summary>
     /// Parses no option as the supplied default, <c>--last=N</c> as a recent-alert limit,
-    /// <c>--all</c> as complete history, or <c>--severity=LEVEL</c> as a severity filter.
+    /// <c>--all</c> as complete history, <c>--severity=LEVEL</c> as a severity filter,
+    /// or <c>--from=TIMESTAMP</c> and <c>--to=TIMESTAMP</c> as an inclusive time range.
     /// </summary>
     /// <param name="arguments">The command-line arguments to parse.</param>
     /// <param name="defaultCount">The recent-alert count used when no argument is supplied.</param>
@@ -32,11 +34,21 @@ internal static class HistoryOptionsParser
         ArgumentNullException.ThrowIfNull(arguments);
         ArgumentOutOfRangeException.ThrowIfNegative(defaultCount);
 
-        selection = new HistorySelection(ShowAll: false, Count: defaultCount, Severity: null);
+        selection = new HistorySelection(
+            ShowAll: false,
+            Count: defaultCount,
+            Severity: null,
+            From: null,
+            To: null);
 
         if (arguments.Length == 0)
         {
             return true;
+        }
+
+        if (arguments.Any(IsTimeRangeOption))
+        {
+            return TryParseTimeRange(arguments, out selection);
         }
 
         if (arguments.Length != 1)
@@ -46,7 +58,12 @@ internal static class HistoryOptionsParser
 
         if (string.Equals(arguments[0], "--all", StringComparison.Ordinal))
         {
-            selection = new HistorySelection(ShowAll: true, Count: 0, Severity: null);
+            selection = new HistorySelection(
+                ShowAll: true,
+                Count: 0,
+                Severity: null,
+                From: null,
+                To: null);
             return true;
         }
 
@@ -66,7 +83,12 @@ internal static class HistoryOptionsParser
                 return false;
             }
 
-            selection = new HistorySelection(ShowAll: false, Count: 0, Severity: severity);
+            selection = new HistorySelection(
+                ShowAll: false,
+                Count: 0,
+                Severity: severity,
+                From: null,
+                To: null);
             return true;
         }
 
@@ -79,7 +101,97 @@ internal static class HistoryOptionsParser
             return false;
         }
 
-        selection = new HistorySelection(ShowAll: false, Count: count, Severity: null);
+        selection = new HistorySelection(
+            ShowAll: false,
+            Count: count,
+            Severity: null,
+            From: null,
+            To: null);
         return true;
+    }
+
+    /// <summary>
+    /// Parses one or both time-range bounds and rejects duplicates, unrelated options,
+    /// malformed timestamps, and reversed ranges.
+    /// </summary>
+    private static bool TryParseTimeRange(
+        string[] arguments,
+        out HistorySelection selection)
+    {
+        selection = new HistorySelection(
+            ShowAll: false,
+            Count: 0,
+            Severity: null,
+            From: null,
+            To: null);
+
+        if (arguments.Length is < 1 or > 2)
+        {
+            return false;
+        }
+
+        DateTimeOffset? from = null;
+        DateTimeOffset? to = null;
+
+        foreach (var argument in arguments)
+        {
+            if (argument.StartsWith("--from=", StringComparison.Ordinal))
+            {
+                if (from.HasValue || !TryParseTimestamp(argument["--from=".Length..], out var value))
+                {
+                    return false;
+                }
+
+                from = value;
+            }
+            else if (argument.StartsWith("--to=", StringComparison.Ordinal))
+            {
+                if (to.HasValue || !TryParseTimestamp(argument["--to=".Length..], out var value))
+                {
+                    return false;
+                }
+
+                to = value;
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        if (from > to)
+        {
+            return false;
+        }
+
+        selection = new HistorySelection(
+            ShowAll: false,
+            Count: 0,
+            Severity: null,
+            From: from,
+            To: to);
+        return true;
+    }
+
+    /// <summary>
+    /// Determines whether an argument starts with a supported time-range option name.
+    /// </summary>
+    private static bool IsTimeRangeOption(string argument)
+    {
+        return argument.StartsWith("--from=", StringComparison.Ordinal)
+            || argument.StartsWith("--to=", StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Parses a timestamp using invariant culture and normalizes timestamps without an explicit
+    /// offset as UTC.
+    /// </summary>
+    private static bool TryParseTimestamp(string value, out DateTimeOffset timestamp)
+    {
+        return DateTimeOffset.TryParse(
+            value,
+            CultureInfo.InvariantCulture,
+            DateTimeStyles.AllowWhiteSpaces | DateTimeStyles.AssumeUniversal,
+            out timestamp);
     }
 }
