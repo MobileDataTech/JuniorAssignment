@@ -45,14 +45,29 @@ var options = new TelemetryPipelineOptions
     SilentCheckInterval = TimeSpan.FromSeconds(1)
 };
 
-// The injected sink controls how every live alert is presented.
-await using var pipeline = new TelemetryPipeline(options, (alert, _) =>
+// The single injected sink persists and displays every alert type emitted by the pipeline.
+await using var pipeline = new TelemetryPipeline(options, async (alert, cancellationToken) =>
 {
-    Console.ForegroundColor = ConsoleColor.Yellow;
-    // Use the same display format for live alerts and saved alert history.
-    Console.WriteLine(AlertHistoryFormatter.Format(alert));
-    Console.ResetColor();
-    return ValueTask.CompletedTask;
+    try
+    {
+        await historyStore.SaveAsync(alert, cancellationToken).ConfigureAwait(false);
+    }
+    catch (Exception exception) when (exception is not OperationCanceledException)
+    {
+        // Persistence failures are visible, but must not interrupt live telemetry monitoring.
+        Console.Error.WriteLine($"Failed to save alert history: {exception.Message}");
+    }
+
+    try
+    {
+        Console.ForegroundColor = ConsoleColor.Yellow;
+        // Use the same display format for live alerts and saved alert history.
+        Console.WriteLine(AlertHistoryFormatter.Format(alert));
+    }
+    finally
+    {
+        Console.ResetColor();
+    }
 });
 
 // Ctrl+C requests cooperative cancellation so device tasks and the pipeline can stop cleanly.

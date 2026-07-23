@@ -58,6 +58,11 @@ Loading a path that does not exist returns an empty history. Invalid JSON instea
 `InvalidDataException` that identifies the affected file, leaving the existing content untouched
 for diagnosis.
 
+Every alert emitted by the telemetry pipeline is sent through one monitor sink, so high pressure,
+out-of-order sequence, and silent-device alerts all follow the same persistence and display path.
+The monitor writes each alert to `alerts.json` before displaying it live. A persistence failure is
+reported to standard error, but does not stop live telemetry processing.
+
 The console app starts five simulated devices. Each device emits a `TelemetryReading` every 100-500ms with a device id, timestamp, pressure, temperature, and sequence number. The simulator occasionally produces a pressure spike and an out-of-order sequence so the alert paths can be seen during a short run.
 
 ## Concurrency approach
