@@ -11,8 +11,8 @@ var options = new TelemetryPipelineOptions
 await using var pipeline = new TelemetryPipeline(options, (alert, _) =>
 {
     Console.ForegroundColor = ConsoleColor.Yellow;
-    Console.WriteLine(
-        $"[{alert.Timestamp:HH:mm:ss.fff}] {alert.Type} {alert.DeviceId}: {alert.Message}");
+    // Use the same display format for live alerts and saved alert history.
+    Console.WriteLine(AlertHistoryFormatter.Format(alert));
     Console.ResetColor();
     return ValueTask.CompletedTask;
 });
