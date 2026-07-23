@@ -10,6 +10,18 @@ Requires the .NET 8 SDK or later.
 dotnet run --project src/PumpTelemetry.Monitor
 ```
 
+The monitor loads `alerts.json` from the current working directory and displays the 10 most
+recent saved alerts before telemetry processing starts. Use `--last=N` to choose a different
+maximum, including zero:
+
+```powershell
+dotnet run --project src/PumpTelemetry.Monitor -- --last=20
+```
+
+`N` must be a non-negative integer. Invalid or unsupported arguments display the command usage
+and exit without starting the monitor. If `alerts.json` does not exist, the monitor reports that
+no saved history was found and continues normally.
+
 Press `Ctrl+C` to stop the monitor gracefully.
 
 ## How to test

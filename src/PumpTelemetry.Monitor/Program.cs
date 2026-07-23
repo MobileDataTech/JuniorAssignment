@@ -1,6 +1,43 @@
 using PumpTelemetry.Core;
 using System.Threading.Channels;
 
+// The monitor is the composition root: it loads saved history, configures the telemetry
+// pipeline, starts the simulated devices, and coordinates graceful shutdown.
+const int defaultHistoryCount = 10;
+
+// Validate command-line input before opening history or starting background work.
+if (!TryParseHistoryCount(args, defaultHistoryCount, out var historyCount))
+{
+    Console.Error.WriteLine("Invalid arguments. Usage: PumpTelemetry.Monitor [--last=N], where N is zero or greater.");
+    return;
+}
+
+// Keep history in a predictable location relative to where the monitor is launched.
+var historyFilePath = Path.Combine(Environment.CurrentDirectory, "alerts.json");
+IAlertHistoryStore historyStore = new JsonAlertHistoryStore(historyFilePath);
+var savedAlerts = await historyStore.LoadAsync().ConfigureAwait(false);
+var recentAlerts = AlertHistoryFilter.GetRecent(savedAlerts, historyCount);
+
+// Display saved alerts before live telemetry output begins.
+Console.WriteLine($"Recent alert history (up to {historyCount}):");
+
+if (savedAlerts.Count == 0)
+{
+    Console.WriteLine("No saved alert history found.");
+}
+else if (recentAlerts.Count == 0)
+{
+    Console.WriteLine("No alerts selected.");
+}
+else
+{
+    foreach (var alert in recentAlerts)
+    {
+        Console.WriteLine(AlertHistoryFormatter.Format(alert));
+    }
+}
+
+// Detection thresholds and polling intervals are configured at the application boundary.
 var options = new TelemetryPipelineOptions
 {
     PressureThreshold = 120,
@@ -8,6 +45,7 @@ var options = new TelemetryPipelineOptions
     SilentCheckInterval = TimeSpan.FromSeconds(1)
 };
 
+// The injected sink controls how every live alert is presented.
 await using var pipeline = new TelemetryPipeline(options, (alert, _) =>
 {
     Console.ForegroundColor = ConsoleColor.Yellow;
@@ -17,6 +55,7 @@ await using var pipeline = new TelemetryPipeline(options, (alert, _) =>
     return ValueTask.CompletedTask;
 });
 
+// Ctrl+C requests cooperative cancellation so device tasks and the pipeline can stop cleanly.
 using var shutdown = new CancellationTokenSource();
 Console.CancelKeyPress += (_, args) =>
 {
@@ -26,6 +65,7 @@ Console.CancelKeyPress += (_, args) =>
 
 pipeline.Start(shutdown.Token);
 
+// Fixed seeds make the five simulated pump streams reproducible between runs.
 var devices = Enumerable.Range(1, 5)
     .Select(i => new DeviceSimulator($"pump-{i:00}", seed: i * 17))
     .ToArray();
@@ -42,6 +82,7 @@ try
 {
     await Task.WhenAll(deviceTasks).ConfigureAwait(false);
 }
+// Cancellation and channel completion are both expected during graceful shutdown.
 catch (OperationCanceledException)
 {
 }
@@ -51,4 +92,22 @@ catch (ChannelClosedException)
 finally
 {
     await pipeline.StopAsync().ConfigureAwait(false);
+}
+
+// Accept either no arguments, which uses the default, or one non-negative --last=N option.
+static bool TryParseHistoryCount(string[] arguments, int defaultCount, out int count)
+{
+    count = defaultCount;
+
+    if (arguments.Length == 0)
+    {
+        return true;
+    }
+
+    const string optionPrefix = "--last=";
+
+    return arguments.Length == 1
+        && arguments[0].StartsWith(optionPrefix, StringComparison.Ordinal)
+        && int.TryParse(arguments[0][optionPrefix.Length..], out count)
+        && count >= 0;
 }
