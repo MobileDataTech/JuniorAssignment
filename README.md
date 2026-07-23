@@ -12,6 +12,55 @@ dotnet run --project src/PumpTelemetry.Monitor
 
 Press `Ctrl+C` to stop the monitor gracefully.
 
+## Alert history
+
+Generated alerts are saved locally as JSON in `alerts.json`. The file is created in the current
+working directory—the directory from which the `dotnet run` command is executed.
+
+At startup, the monitor loads this file and displays the 10 most recent saved alerts before live
+telemetry processing begins. Use `--last=N` to choose a different maximum, including zero:
+
+```powershell
+dotnet run --project src/PumpTelemetry.Monitor -- --last=20
+```
+
+`N` must be a non-negative integer. Invalid or unsupported arguments display the command usage
+and exit without starting the monitor.
+
+To display every saved alert, ordered from newest to oldest, use:
+
+```powershell
+dotnet run --project src/PumpTelemetry.Monitor -- --all
+```
+
+`--all` and `--last=N` are alternative startup display modes and cannot be used together.
+The all-history option can produce substantial console output when the history file is large.
+
+To display only alerts with a specific severity, use `Warning` or `Critical`:
+
+```powershell
+dotnet run --project src/PumpTelemetry.Monitor -- --severity=Critical
+```
+
+High-pressure and silent-device alerts are classified as `Critical`. Out-of-order sequence
+alerts are classified as `Warning`. Severity filtering is an alternative to `--last=N` and
+`--all`; only one startup display option can be supplied.
+
+To display alerts within an inclusive time range, use ISO-8601 timestamps:
+
+```powershell
+dotnet run --project src/PumpTelemetry.Monitor -- --from=2026-07-23T08:00:00Z --to=2026-07-23T17:00:00Z
+```
+
+Either bound can be used by itself. `--from=TIMESTAMP` displays alerts at or after the start,
+while `--to=TIMESTAMP` displays alerts at or before the end. Results are ordered newest-first.
+The start must not be later than the end, and time-range options cannot be combined with
+`--last=N`, `--all`, or `--severity`.
+
+If `alerts.json` does not exist, the monitor treats the history as empty, reports that no saved
+alerts were found, and continues normally. If an alert cannot be persisted, the monitor reports
+the failure to standard error and continues processing and displaying live telemetry alerts.
+
 ## How to test
 
 ```powershell
@@ -25,6 +74,31 @@ The solution is split into:
 - `PumpTelemetry.Core`: telemetry models, simulated device producers, processing pipeline, and alert detection.
 - `PumpTelemetry.Monitor`: console entry point that wires devices, pipeline, and console alert output together.
 - `PumpTelemetry.Tests`: xUnit tests for threshold, sequence, silence, and concurrent submission behavior.
+
+### Alert history storage contract
+
+`IAlertHistoryStore` defines the two operations required by alert history: loading saved
+`TelemetryAlert` instances and saving one generated alert. Both operations are asynchronous
+and accept a `CancellationToken` so they can participate in the monitor's shutdown flow.
+
+The contract is storage-independent so the monitor can use JSON persistence without coupling
+alert generation to a file format. It also allows tests to substitute an in-memory store while
+the production application uses a file-backed implementation.
+
+`JsonAlertHistoryStore` is the local file implementation. It receives its history file path
+through the constructor, stores alerts in a JSON array, and writes alert types as readable enum
+names. Saving an alert retains the existing entries before adding the new one. File operations
+are asynchronous, and access through one store instance is serialized so simultaneous alert
+writes do not corrupt history.
+
+Loading a path that does not exist returns an empty history. Invalid JSON instead produces an
+`InvalidDataException` that identifies the affected file, leaving the existing content untouched
+for diagnosis.
+
+Every alert emitted by the telemetry pipeline is sent through one monitor sink, so high pressure,
+out-of-order sequence, and silent-device alerts all follow the same persistence and display path.
+The monitor writes each alert to `alerts.json` before displaying it live. A persistence failure is
+reported to standard error, but does not stop live telemetry processing.
 
 The console app starts five simulated devices. Each device emits a `TelemetryReading` every 100-500ms with a device id, timestamp, pressure, temperature, and sequence number. The simulator occasionally produces a pressure spike and an out-of-order sequence so the alert paths can be seen during a short run.
 
