@@ -6,6 +6,26 @@ namespace PumpTelemetry.Core;
 public static class AlertHistoryFilter
 {
     /// <summary>
+    /// Selects alerts that have the requested severity.
+    /// </summary>
+    /// <param name="alerts">The alerts to filter.</param>
+    /// <param name="severity">The severity that returned alerts must have.</param>
+    /// <returns>A read-only list containing only alerts with the requested severity.</returns>
+    /// <exception cref="ArgumentNullException">
+    /// Thrown when <paramref name="alerts"/> is <see langword="null"/>.
+    /// </exception>
+    public static IReadOnlyList<TelemetryAlert> GetBySeverity(
+        IEnumerable<TelemetryAlert> alerts,
+        TelemetryAlertSeverity severity)
+    {
+        ArgumentNullException.ThrowIfNull(alerts);
+
+        return alerts
+            .Where(alert => alert.Severity == severity)
+            .ToArray();
+    }
+
+    /// <summary>
     /// Selects up to the requested number of alerts, ordered from newest to oldest.
     /// </summary>
     /// <param name="alerts">The alerts to filter.</param>

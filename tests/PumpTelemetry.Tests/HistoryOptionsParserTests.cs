@@ -21,6 +21,7 @@ public sealed class HistoryOptionsParserTests
         Assert.True(success);
         Assert.False(selection.ShowAll);
         Assert.Equal(DefaultCount, selection.Count);
+        Assert.Null(selection.Severity);
     }
 
     [Fact]
@@ -34,6 +35,7 @@ public sealed class HistoryOptionsParserTests
         Assert.True(success);
         Assert.False(selection.ShowAll);
         Assert.Equal(20, selection.Count);
+        Assert.Null(selection.Severity);
     }
 
     [Fact]
@@ -46,12 +48,33 @@ public sealed class HistoryOptionsParserTests
 
         Assert.True(success);
         Assert.True(selection.ShowAll);
+        Assert.Null(selection.Severity);
+    }
+
+    [Theory]
+    [InlineData("--severity=Warning", TelemetryAlertSeverity.Warning)]
+    [InlineData("--severity=critical", TelemetryAlertSeverity.Critical)]
+    public void TryParse_WhenSeverityIsValid_SelectsRequestedSeverity(
+        string argument,
+        TelemetryAlertSeverity expectedSeverity)
+    {
+        var success = HistoryOptionsParser.TryParse(
+            new[] { argument },
+            DefaultCount,
+            out var selection);
+
+        Assert.True(success);
+        Assert.False(selection.ShowAll);
+        Assert.Equal(expectedSeverity, selection.Severity);
     }
 
     [Theory]
     [InlineData("--last=-1")]
     [InlineData("--last=not-a-number")]
-    public void TryParse_WhenLastIsInvalid_ReturnsFalse(string argument)
+    [InlineData("--severity=")]
+    [InlineData("--severity=Unknown")]
+    [InlineData("--severity=1")]
+    public void TryParse_WhenOptionIsInvalid_ReturnsFalse(string argument)
     {
         var success = HistoryOptionsParser.TryParse(
             new[] { argument },
@@ -101,10 +124,33 @@ public sealed class HistoryOptionsParserTests
         Assert.Equal(new[] { alerts[2], alerts[1], alerts[0] }, result);
     }
 
-    private static TelemetryAlert Alert(string deviceId, DateTimeOffset timestamp)
+    [Fact]
+    public void SeveritySelection_ReturnsMatchingSavedAlertsNewestFirst()
+    {
+        var alerts = new[]
+        {
+            Alert("pump-01", BaseTimestamp, TelemetryAlertType.HighPressure),
+            Alert("pump-02", BaseTimestamp.AddMinutes(1), TelemetryAlertType.OutOfOrderSequence),
+            Alert("pump-03", BaseTimestamp.AddMinutes(2), TelemetryAlertType.DeviceSilent)
+        };
+        HistoryOptionsParser.TryParse(
+            new[] { "--severity=Critical" },
+            DefaultCount,
+            out var selection);
+
+        var matchingAlerts = AlertHistoryFilter.GetBySeverity(alerts, selection.Severity!.Value);
+        var result = AlertHistoryFilter.GetRecent(matchingAlerts, matchingAlerts.Count);
+
+        Assert.Equal(new[] { alerts[2], alerts[0] }, result);
+    }
+
+    private static TelemetryAlert Alert(
+        string deviceId,
+        DateTimeOffset timestamp,
+        TelemetryAlertType type = TelemetryAlertType.HighPressure)
     {
         return new TelemetryAlert(
-            TelemetryAlertType.HighPressure,
+            type,
             deviceId,
             timestamp,
             "Test alert.");

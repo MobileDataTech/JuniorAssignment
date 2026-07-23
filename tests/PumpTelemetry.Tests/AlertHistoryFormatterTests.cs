@@ -27,7 +27,7 @@ public sealed class AlertHistoryFormatterTests
         var result = AlertHistoryFormatter.Format(alert);
 
         Assert.Equal(
-            "[12:34:56.789] HighPressure pump-01: Pressure 125.0 exceeded threshold 120.0.",
+            "[12:34:56.789] Critical HighPressure pump-01: Pressure 125.0 exceeded threshold 120.0.",
             result);
     }
 
@@ -50,7 +50,7 @@ public sealed class AlertHistoryFormatterTests
         var result = AlertHistoryFormatter.Format(alert);
 
         Assert.Equal(
-            "[12:34:56.789] OutOfOrderSequence pump-02: Sequence 9 arrived after 10.",
+            "[12:34:56.789] Warning OutOfOrderSequence pump-02: Sequence 9 arrived after 10.",
             result);
     }
 
@@ -67,7 +67,7 @@ public sealed class AlertHistoryFormatterTests
         var result = AlertHistoryFormatter.Format(alert);
 
         Assert.Equal(
-            "[12:34:56.789] DeviceSilent pump-03: Device has been silent for more than 5 seconds.",
+            "[12:34:56.789] Critical DeviceSilent pump-03: Device has been silent for more than 5 seconds.",
             result);
     }
 }

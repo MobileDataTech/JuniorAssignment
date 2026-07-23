@@ -1,5 +1,7 @@
 namespace PumpTelemetry.Monitor;
 
+using PumpTelemetry.Core;
+
 /// <summary>
 /// Parses the command-line option that controls startup alert history output.
 /// </summary>
@@ -7,7 +9,7 @@ internal static class HistoryOptionsParser
 {
     /// <summary>
     /// Parses no option as the supplied default, <c>--last=N</c> as a recent-alert limit,
-    /// or <c>--all</c> as complete history.
+    /// <c>--all</c> as complete history, or <c>--severity=LEVEL</c> as a severity filter.
     /// </summary>
     /// <param name="arguments">The command-line arguments to parse.</param>
     /// <param name="defaultCount">The recent-alert count used when no argument is supplied.</param>
@@ -30,7 +32,7 @@ internal static class HistoryOptionsParser
         ArgumentNullException.ThrowIfNull(arguments);
         ArgumentOutOfRangeException.ThrowIfNegative(defaultCount);
 
-        selection = new HistorySelection(ShowAll: false, Count: defaultCount);
+        selection = new HistorySelection(ShowAll: false, Count: defaultCount, Severity: null);
 
         if (arguments.Length == 0)
         {
@@ -44,7 +46,27 @@ internal static class HistoryOptionsParser
 
         if (string.Equals(arguments[0], "--all", StringComparison.Ordinal))
         {
-            selection = new HistorySelection(ShowAll: true, Count: 0);
+            selection = new HistorySelection(ShowAll: true, Count: 0, Severity: null);
+            return true;
+        }
+
+        const string severityPrefix = "--severity=";
+
+        if (arguments[0].StartsWith(severityPrefix, StringComparison.Ordinal))
+        {
+            var severityText = arguments[0][severityPrefix.Length..];
+
+            if (!Enum.TryParse<TelemetryAlertSeverity>(
+                    severityText,
+                    ignoreCase: true,
+                    out var severity)
+                || !Enum.GetNames<TelemetryAlertSeverity>()
+                    .Contains(severityText, StringComparer.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            selection = new HistorySelection(ShowAll: false, Count: 0, Severity: severity);
             return true;
         }
 
@@ -57,7 +79,7 @@ internal static class HistoryOptionsParser
             return false;
         }
 
-        selection = new HistorySelection(ShowAll: false, Count: count);
+        selection = new HistorySelection(ShowAll: false, Count: count, Severity: null);
         return true;
     }
 }

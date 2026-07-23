@@ -10,7 +10,7 @@ const int defaultHistoryCount = 10;
 if (!HistoryOptionsParser.TryParse(args, defaultHistoryCount, out var historySelection))
 {
     Console.Error.WriteLine(
-        "Invalid arguments. Usage: PumpTelemetry.Monitor [--last=N | --all], where N is zero or greater.");
+        "Invalid arguments. Usage: PumpTelemetry.Monitor [--last=N | --all | --severity=Warning|Critical], where N is zero or greater.");
     return;
 }
 
@@ -18,15 +18,22 @@ if (!HistoryOptionsParser.TryParse(args, defaultHistoryCount, out var historySel
 var historyFilePath = Path.Combine(Environment.CurrentDirectory, "alerts.json");
 IAlertHistoryStore historyStore = new JsonAlertHistoryStore(historyFilePath);
 var savedAlerts = await historyStore.LoadAsync().ConfigureAwait(false);
+var severityAlerts = historySelection.Severity.HasValue
+    ? AlertHistoryFilter.GetBySeverity(savedAlerts, historySelection.Severity.Value)
+    : savedAlerts;
 var displayedAlerts = AlertHistoryFilter.GetRecent(
-    savedAlerts,
-    historySelection.ShowAll ? savedAlerts.Count : historySelection.Count);
+    severityAlerts,
+    historySelection.ShowAll || historySelection.Severity.HasValue
+        ? severityAlerts.Count
+        : historySelection.Count);
 
 // Display saved alerts before live telemetry output begins.
 Console.WriteLine(
-    historySelection.ShowAll
-        ? "Saved alert history:"
-        : $"Recent alert history (up to {historySelection.Count}):");
+    historySelection.Severity.HasValue
+        ? $"Alert history with severity {historySelection.Severity}:"
+        : historySelection.ShowAll
+            ? "Saved alert history:"
+            : $"Recent alert history (up to {historySelection.Count}):");
 
 if (savedAlerts.Count == 0)
 {

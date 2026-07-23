@@ -64,6 +64,7 @@ public sealed class JsonAlertHistoryStoreTests : IDisposable
         var json = await File.ReadAllTextAsync(filePath);
 
         Assert.Contains("\"Type\": \"DeviceSilent\"", json);
+        Assert.Contains("\"Severity\": \"Critical\"", json);
     }
 
     [Fact]

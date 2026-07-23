@@ -9,6 +9,29 @@ public sealed class AlertHistoryFilterTests
         new(2026, 7, 23, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public void GetBySeverity_ReturnsOnlyAlertsWithRequestedSeverity()
+    {
+        var criticalPressure = Alert(
+            "pump-01",
+            BaseTimestamp,
+            TelemetryAlertType.HighPressure);
+        var warningSequence = Alert(
+            "pump-02",
+            BaseTimestamp.AddMinutes(1),
+            TelemetryAlertType.OutOfOrderSequence);
+        var criticalSilent = Alert(
+            "pump-03",
+            BaseTimestamp.AddMinutes(2),
+            TelemetryAlertType.DeviceSilent);
+
+        var result = AlertHistoryFilter.GetBySeverity(
+            new[] { criticalPressure, warningSequence, criticalSilent },
+            TelemetryAlertSeverity.Critical);
+
+        Assert.Equal(new[] { criticalPressure, criticalSilent }, result);
+    }
+
+    [Fact]
     public void GetRecent_OrdersAlertsNewestFirst()
     {
         var oldest = Alert("pump-01", BaseTimestamp);
@@ -75,10 +98,13 @@ public sealed class AlertHistoryFilterTests
             () => AlertHistoryFilter.GetRecent(Array.Empty<TelemetryAlert>(), -1));
     }
 
-    private static TelemetryAlert Alert(string deviceId, DateTimeOffset timestamp)
+    private static TelemetryAlert Alert(
+        string deviceId,
+        DateTimeOffset timestamp,
+        TelemetryAlertType type = TelemetryAlertType.HighPressure)
     {
         return new TelemetryAlert(
-            TelemetryAlertType.HighPressure,
+            type,
             deviceId,
             timestamp,
             "Test alert.");

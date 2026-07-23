@@ -36,6 +36,16 @@ dotnet run --project src/PumpTelemetry.Monitor -- --all
 `--all` and `--last=N` are alternative startup display modes and cannot be used together.
 The all-history option can produce substantial console output when the history file is large.
 
+To display only alerts with a specific severity, use `Warning` or `Critical`:
+
+```powershell
+dotnet run --project src/PumpTelemetry.Monitor -- --severity=Critical
+```
+
+High-pressure and silent-device alerts are classified as `Critical`. Out-of-order sequence
+alerts are classified as `Warning`. Severity filtering is an alternative to `--last=N` and
+`--all`; only one startup display option can be supplied.
+
 If `alerts.json` does not exist, the monitor treats the history as empty, reports that no saved
 alerts were found, and continues normally. If an alert cannot be persisted, the monitor reports
 the failure to standard error and continues processing and displaying live telemetry alerts.

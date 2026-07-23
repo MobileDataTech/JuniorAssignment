@@ -10,7 +10,7 @@ public static class AlertHistoryFormatter
     /// </summary>
     /// <param name="alert">The telemetry alert to format.</param>
     /// <returns>
-    /// A string containing the alert timestamp, type, device identifier, and message.
+    /// A string containing the alert timestamp, severity, type, device identifier, and message.
     /// </returns>
     /// <exception cref="ArgumentNullException">
     /// Thrown when <paramref name="alert"/> is <see langword="null"/>.
@@ -19,6 +19,6 @@ public static class AlertHistoryFormatter
     {
         ArgumentNullException.ThrowIfNull(alert);
 
-        return $"[{alert.Timestamp:HH:mm:ss.fff}] {alert.Type} {alert.DeviceId}: {alert.Message}";
+        return $"[{alert.Timestamp:HH:mm:ss.fff}] {alert.Severity} {alert.Type} {alert.DeviceId}: {alert.Message}";
     }
 }
