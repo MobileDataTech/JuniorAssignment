@@ -26,6 +26,16 @@ The solution is split into:
 - `PumpTelemetry.Monitor`: console entry point that wires devices, pipeline, and console alert output together.
 - `PumpTelemetry.Tests`: xUnit tests for threshold, sequence, silence, and concurrent submission behavior.
 
+### Alert history storage contract
+
+`IAlertHistoryStore` defines the two operations required by alert history: loading saved
+`TelemetryAlert` instances and saving one generated alert. Both operations are asynchronous
+and accept a `CancellationToken` so they can participate in the monitor's shutdown flow.
+
+The contract is storage-independent so the monitor can use JSON persistence without coupling
+alert generation to a file format. It also allows tests to substitute an in-memory store while
+the production application uses a file-backed implementation.
+
 The console app starts five simulated devices. Each device emits a `TelemetryReading` every 100-500ms with a device id, timestamp, pressure, temperature, and sequence number. The simulator occasionally produces a pressure spike and an out-of-order sequence so the alert paths can be seen during a short run.
 
 ## Concurrency approach
