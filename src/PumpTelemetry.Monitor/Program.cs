@@ -1,6 +1,39 @@
 using PumpTelemetry.Core;
 using System.Threading.Channels;
 
+// parsing optional CLI filters
+string? severity = null;
+int? last = null;
+
+foreach (var arg in args)
+{
+    if (arg.StartsWith("--severity="))
+    {
+        severity = arg.Substring("--severity=".Length);
+    }
+    else if (arg.StartsWith("--last="))
+    {
+        if (int.TryParse(arg.Substring("--last=".Length), out var parsed))
+        {
+            last = parsed;
+        }
+    }
+}
+
+// Load history saved by previous runs and print a filtered view on startup.
+// Filters narrow what is shown only; every alert is still persisted (below).
+var historyStore = new AlertHistoryStore("alert-history.jsonl");
+var history = AlertHistoryStore.ApplyFilter(historyStore.Load(), severity, last);
+
+Console.WriteLine($"=== Alert History ({history.Count} shown) ===");
+foreach (var record in history)
+{
+    Console.WriteLine(
+        $"[{record.Timestamp:yyyy-MM-dd HH:mm:ss}] {record.Type} {record.DeviceId}: {record.Message}");
+}
+Console.WriteLine("=== End of history ===");
+Console.WriteLine();
+
 var options = new TelemetryPipelineOptions
 {
     PressureThreshold = 120,
@@ -10,6 +43,7 @@ var options = new TelemetryPipelineOptions
 
 await using var pipeline = new TelemetryPipeline(options, (alert, _) =>
 {
+    historyStore.Append(AlertRecord.FromAlert(alert)); // each alert is both printed and persisted
     Console.ForegroundColor = ConsoleColor.Yellow;
     Console.WriteLine(
         $"[{alert.Timestamp:HH:mm:ss.fff}] {alert.Type} {alert.DeviceId}: {alert.Message}");
