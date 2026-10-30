@@ -90,3 +90,6 @@ src/**/[Bb]in/
 src/**/[Oo]bj/
 tests/**/[Bb]in/
 tests/**/[Oo]bj/
+
+# Generated alert history (runtime data)
+alerts.jsonl
