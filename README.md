@@ -43,3 +43,58 @@ The pipeline emits console alerts for:
 - devices silent for more than 5 seconds.
 
 Silent-device detection starts tracking a device after its first reading, because the monitor has no external device registry in this small assignment.
+
+## Alert history
+
+The monitor loads and displays the latest 10 alerts on startup and saves new alerts
+in `alert-history.json` in the current working directory. Run commands from the
+same directory to reuse that history. The file is ignored by Git.
+
+```sh
+# Display the latest 5 saved alerts and exit without starting simulated pumps
+dotnet run --project src/PumpTelemetry.Monitor -- --history --last=5
+
+# Display the latest 20 saved alerts, then start monitoring
+dotnet run --project src/PumpTelemetry.Monitor -- --last=20
+```
+
+`--last` must be a positive integer; invalid arguments exit with an error.
+History is displayed newest first by timestamp and includes the alert type, device,
+value, threshold, units, and message. Sequence alerts contain the sequence value;
+silent-device alerts contain the configured silence threshold in seconds.
+Unavailable values are shown as `n/a`.
+
+This small implementation assumes one monitor process per history file and modest
+history size. Writes are serialized within the process and replace the JSON file
+via a temporary file after each alert. History is retained without a size limit.
+Unreadable or malformed history prevents startup so existing data is preserved;
+repair or move the file before retrying. Save failures are printed to stderr and
+set a nonzero exit code while live monitoring continues.
+
+### Assumptions and limitations
+
+- One monitor process uses each history file.
+- History is modest in size: each save rewrites the file, and there is no automatic retention.
+- History is stored in the current working directory and filtered by recent entries.
+
+### Test suites
+
+Tests follow this project's convention of unit → functional → integration,
+with matching folders and xUnit `Category` traits:
+
+- `Unit`: alert mapping, CLI parsing, history formatting/filtering, and pipeline detection/lifecycle using in-memory alert sinks.
+- `Functional`: the history store with real temporary files, including concurrent writes, reopening, and corrupt-file preservation.
+- `Integration`: launches the actual console application in a separate process and isolated temporary directory. Covers history-only mode, JSON loading/order/limits, invalid CLI options, corrupt history, and live alert persistence followed by history retrieval in a new process.
+
+```sh
+dotnet test                                 # all suites
+dotnet test --filter 'Category=Unit'         # unit tests only
+dotnet test --filter 'Category=Functional'   # history storage feature tests
+dotnet test --filter 'Category=Integration'  # console application end to end
+```
+
+Integration tests use the SDK's .NET host and build the monitor automatically.
+The live test waits up to 20 seconds for a persisted alert, then terminates the
+monitor process and verifies history through a fresh process. It tests persistence
+across process termination; it does not assert graceful Ctrl+C shutdown.
+All test history files are isolated from your normal `alert-history.json`.

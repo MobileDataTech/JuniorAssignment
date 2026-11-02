@@ -4,6 +4,7 @@ using Xunit;
 
 namespace PumpTelemetry.Tests;
 
+[Trait("Category", "Unit")]
 public sealed class TelemetryPipelineTests
 {
     [Fact]

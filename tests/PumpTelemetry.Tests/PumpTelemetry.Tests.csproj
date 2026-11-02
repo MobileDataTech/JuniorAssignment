@@ -12,6 +12,14 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="2.8.1" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="../../src/PumpTelemetry.Monitor/PumpTelemetry.Monitor.csproj" />
     <ProjectReference Include="..\..\src\PumpTelemetry.Core\PumpTelemetry.Core.csproj" />
   </ItemGroup>
+  <!-- Integration tests launch the built console app with its runtime configuration. -->
+  <Target Name="CopyMonitorForIntegrationTests" AfterTargets="Build">
+    <ItemGroup>
+      <MonitorFiles Include="$(MSBuildProjectDirectory)/../../src/PumpTelemetry.Monitor/bin/$(Configuration)/net8.0/*" />
+    </ItemGroup>
+    <Copy SourceFiles="@(MonitorFiles)" DestinationFolder="$(OutDir)Monitor" />
+  </Target>
 </Project>

@@ -90,3 +90,7 @@ src/**/[Bb]in/
 src/**/[Oo]bj/
 tests/**/[Bb]in/
 tests/**/[Oo]bj/
+
+# Local alert history
+alert-history.json
+alert-history.json.tmp
