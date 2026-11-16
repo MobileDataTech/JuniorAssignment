@@ -85,6 +85,10 @@ Icon?
 # OneDrive cache files
 ~$*
 
+# Runtime alert history
+alert-history.json
+alert-history.jsonl
+
 # Ignore build outputs and package folders for the repo
 src/**/[Bb]in/
 src/**/[Oo]bj/

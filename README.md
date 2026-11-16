@@ -12,6 +12,8 @@ dotnet run --project src/PumpTelemetry.Monitor
 
 Press `Ctrl+C` to stop the monitor gracefully.
 
+**For alert history filters (`--last`, `--severity`), see [Alert history](#alert-history) below.**
+
 ## How to test
 
 ```powershell
@@ -22,9 +24,9 @@ dotnet test
 
 The solution is split into:
 
-- `PumpTelemetry.Core`: telemetry models, simulated device producers, processing pipeline, and alert detection.
-- `PumpTelemetry.Monitor`: console entry point that wires devices, pipeline, and console alert output together.
-- `PumpTelemetry.Tests`: xUnit tests for threshold, sequence, silence, and concurrent submission behavior.
+- `PumpTelemetry.Core`: telemetry models, simulated device producers, processing pipeline, alert detection, and alert history persistence (`AlertRecord`, `AlertHistoryStore`).
+- `PumpTelemetry.Monitor`: console entry point that wires devices, pipeline, console alert output, history load/display, and CLI filters.
+- `PumpTelemetry.Tests`: xUnit tests for threshold, sequence, silence, concurrent submission, and alert history persistence/filtering.
 
 The console app starts five simulated devices. Each device emits a `TelemetryReading` every 100-500ms with a device id, timestamp, pressure, temperature, and sequence number. The simulator occasionally produces a pressure spike and an out-of-order sequence so the alert paths can be seen during a short run.
 
@@ -43,3 +45,44 @@ The pipeline emits console alerts for:
 - devices silent for more than 5 seconds.
 
 Silent-device detection starts tracking a device after its first reading, because the monitor has no external device registry in this small assignment.
+
+## Alert history
+
+Generated alerts are appended to `alert-history.jsonl` in the current working directory.
+
+When the monitor starts, it loads that file and prints recent history before live monitoring begins. New alerts from the current run are appended to the same file as they are raised.
+
+### Saved fields
+
+Each history record includes timestamp (UTC), alert type, severity, device / pump ID, and message. When relevant, it also stores pressure, sequence number, pressure threshold, or silent timeout seconds.
+
+### Severity mapping
+
+Severity is derived from alert type:
+
+- `HighPressure` → High
+- `DeviceSilent` → Medium
+- `OutOfOrderSequence` → Low
+
+### Filters
+
+Startup history can be narrowed with CLI options. Pass them after `--` so `dotnet run` forwards them to the app:
+
+```powershell
+# Show the 5 most recent saved alerts, then start monitoring
+dotnet run --project src/PumpTelemetry.Monitor -- --last=5
+
+# Show only high-severity alerts (up to 10 by default)
+dotnet run --project src/PumpTelemetry.Monitor -- --severity=high
+
+# Combine filters
+dotnet run --project src/PumpTelemetry.Monitor -- --severity=high --last=10
+```
+
+When both filters are provided, severity filtering is applied first, then the most recent N matching alerts are kept.
+
+### Notes
+
+- Valid `--severity` values: `low`, `medium`, `high` (case-insensitive). `--last` must be a positive integer (default `10`).
+- Filters only change what is displayed at startup. They do not delete alerts from the file.
+- A missing history file means empty history (first run). The history file is never trimmed; delete `alert-history.jsonl` to clear it.
